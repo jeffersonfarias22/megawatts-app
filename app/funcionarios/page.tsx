@@ -8,7 +8,7 @@ interface PagamentoFuncionario {
   nome_funcionario: string;
   funcao: string;
   valor_pago: number;
-  criado_em: string; // formato YYYY-MM-DD ou data/hora completa
+  criado_em: string;
 }
 
 export default function EquipePage() {
@@ -16,11 +16,12 @@ export default function EquipePage() {
   
   const [pagamentos, setPagamentos] = useState<PagamentoFuncionario[]>([]);
   const [carregando, setCarregando] = useState(true);
+  const [salvando, setSalvando] = useState(false);
 
   // Estados dos inputs de cadastro
   const [nomeFuncionario, setNomeFuncionario] = useState('');
   const [funcao, setFuncao] = useState('');
-  const [valorPago, setValorPago] = useState('');
+  const [valorPagoInput, setValorPagoInput] = useState('');
 
   // Estados de Filtro (Dia, Mês, Ano e Funcionário)
   const [tipoFiltro, setTipoFiltro] = useState<'dia' | 'mes' | 'ano'>('mes');
@@ -36,7 +37,7 @@ export default function EquipePage() {
   const carregarPagamentos = async () => {
     setCarregando(true);
     const { data, error } = await supabase
-      .from('pagamentos_funcionarios') // Ajuste o nome da sua tabela se for diferente
+      .from('pagamentos_funcionarios')
       .select('*')
       .order('criado_em', { ascending: false });
 
@@ -48,16 +49,38 @@ export default function EquipePage() {
     setCarregando(false);
   };
 
+  // Máscaras e Formatação de BRL
+  const formatarMoeda = (val: number) =>
+    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0);
+
+  const aplicarMascaraMoeda = (valor: string) => {
+    const apenasNumeros = valor.replace(/\D/g, '');
+    if (!apenasNumeros) return '';
+    const valorNumerico = Number(apenasNumeros) / 100;
+    return valorNumerico.toLocaleString('pt-BR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  };
+
+  const converterParaNumeroDecimal = (valorFormatado: string) => {
+    if (!valorFormatado) return 0;
+    const limpo = valorFormatado.replace(/\./g, '').replace(',', '.');
+    return parseFloat(limpo) || 0;
+  };
+
   const handleSalvarPagamento = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nomeFuncionario || !valorPago) return;
+    if (!nomeFuncionario || !valorPagoInput) return;
 
-    const dataAtualStr = new Date().toISOString(); // Salva data e hora atual do lançamento
+    setSalvando(true);
+    const dataAtualStr = new Date().toISOString();
+    const valorNumerico = converterParaNumeroDecimal(valorPagoInput);
 
     const payload = {
       nome_funcionario: nomeFuncionario,
       funcao,
-      valor_pago: Number(valorPago),
+      valor_pago: valorNumerico,
       criado_em: dataAtualStr,
     };
 
@@ -68,9 +91,10 @@ export default function EquipePage() {
     } else {
       setNomeFuncionario('');
       setFuncao('');
-      setValorPago('');
-      carregarPagamentos();
+      setValorPagoInput('');
+      await carregarPagamentos();
     }
+    setSalvando(false);
   };
 
   const excluirPagamento = async (id: number) => {
@@ -79,12 +103,9 @@ export default function EquipePage() {
     if (error) {
       alert('Erro ao excluir: ' + error.message);
     } else {
-      carregarPagamentos();
+      await carregarPagamentos();
     }
   };
-
-  const formatarMoeda = (val: number) =>
-    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0);
 
   // Lista única de funcionários para o select de filtro
   const listaFuncionariosUnicos = ['Todos', ...Array.from(new Set(pagamentos.map((p) => p.nome_funcionario).filter(Boolean)))];
@@ -118,7 +139,7 @@ export default function EquipePage() {
   const totalGeralAbsoluto = pagamentos.reduce((acc, curr) => acc + Number(curr.valor_pago || 0), 0);
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6">
       {/* Cabeçalho e Filtros */}
       <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center bg-slate-800/50 p-4 rounded-xl border border-slate-700/80 gap-4">
         <div>
@@ -133,7 +154,7 @@ export default function EquipePage() {
             <select
               value={funcionarioFiltro}
               onChange={(e) => setFuncionarioFiltro(e.target.value)}
-              className="bg-slate-800 text-xs font-semibold text-white border border-slate-700 rounded p-1 outline-none focus:border-yellow-500"
+              className="bg-slate-800 text-xs font-semibold text-white border border-slate-700 rounded p-1 outline-none focus:border-yellow-500 cursor-pointer"
             >
               {listaFuncionariosUnicos.map((func) => (
                 <option key={func} value={func}>
@@ -155,7 +176,7 @@ export default function EquipePage() {
                 if (novoTipo === 'mes') setValorFiltro(`${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`);
                 if (novoTipo === 'ano') setValorFiltro(String(hoje.getFullYear()));
               }}
-              className="bg-slate-800 text-xs font-semibold text-slate-200 border border-slate-700 rounded p-1 outline-none focus:border-yellow-500"
+              className="bg-slate-800 text-xs font-semibold text-slate-200 border border-slate-700 rounded p-1 outline-none focus:border-yellow-500 cursor-pointer"
             >
               <option value="dia">Dia</option>
               <option value="mes">Mês</option>
@@ -241,21 +262,21 @@ export default function EquipePage() {
           <div>
             <label className="block text-xs font-semibold text-slate-300 mb-1">Valor Pago (R$)</label>
             <input
-              type="number"
-              step="0.01"
+              type="text"
               required
-              placeholder="2500.00"
-              value={valorPago}
-              onChange={(e) => setValorPago(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-yellow-500"
+              placeholder="0,00"
+              value={valorPagoInput}
+              onChange={(e) => setValorPagoInput(aplicarMascaraMoeda(e.target.value))}
+              className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm font-semibold text-white focus:outline-none focus:border-yellow-500"
             />
           </div>
 
           <button
             type="submit"
+            disabled={salvando}
             className="bg-yellow-500 hover:bg-yellow-400 text-slate-950 font-bold p-2.5 rounded-lg text-sm transition shadow h-[42px]"
           >
-            Salvar Pagamento
+            {salvando ? 'Salvando...' : 'Salvar Pagamento'}
           </button>
         </form>
       </div>
@@ -268,7 +289,7 @@ export default function EquipePage() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+          <table className="w-full text-left border-collapse min-w-[700px]">
             <thead>
               <tr className="bg-slate-900/60 text-slate-400 text-xs uppercase tracking-wider border-b border-slate-700">
                 <th className="p-3">Data e Hora</th>
@@ -289,7 +310,6 @@ export default function EquipePage() {
                 </tr>
               ) : (
                 pagamentosFiltrados.map((item) => {
-                  // Formatação de data/hora amigável
                   let dataFormatada = item.criado_em;
                   try {
                     const d = new Date(item.criado_em);
