@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { useRouter } from 'next/navigation';
 
 interface Obra {
   id: number;
@@ -17,8 +16,6 @@ interface Obra {
 }
 
 export default function ObrasPage() {
-  const router = useRouter();
-
   // Data atual para o filtro
   const hoje = new Date();
   const mesAtualFormatted = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`;
@@ -42,13 +39,8 @@ export default function ObrasPage() {
   const [editGastoAtual, setEditGastoAtual] = useState('');
 
   useEffect(() => {
-    const verificar = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) router.push('/login');
-      else carregarObras();
-    };
-    verificar();
-  }, [router]);
+    carregarObras();
+  }, []);
 
   const carregarObras = async () => {
     setCarregando(true);
@@ -510,7 +502,7 @@ export default function ObrasPage() {
                               onClick={() => excluirObra(item.id)}
                               className="bg-rose-600/80 hover:bg-rose-600 text-white text-xs py-1 px-2.5 rounded transition"
                             >
-                              Excluir
+                              Exclui
                             </button>
                           </div>
                         </td>

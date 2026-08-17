@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { useRouter } from 'next/navigation';
 
 interface ItemFinanceiro {
   id: number;
@@ -13,7 +12,6 @@ interface ItemFinanceiro {
 }
 
 export default function FinanceiroPage() {
-  const router = useRouter();
   const [dadosFinanceiros, setDadosFinanceiros] = useState<ItemFinanceiro[]>([]);
   const [mesInput, setMesInput] = useState(() => new Date().toISOString().slice(0, 7));
   const [receitaInput, setReceitaInput] = useState('');
@@ -21,13 +19,8 @@ export default function FinanceiroPage() {
   const [salvando, setSalvando] = useState(false);
 
   useEffect(() => {
-    const verificar = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) router.push('/login');
-      else carregarDados();
-    };
-    verificar();
-  }, [router]);
+    carregarDados();
+  }, []);
 
   const carregarDados = async () => {
     const { data } = await supabase.from('financeiro_mensal').select('*').order('id', { ascending: false });

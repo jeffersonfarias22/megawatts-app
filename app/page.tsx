@@ -37,7 +37,6 @@ export default function VisaoGeralPage() {
   const formatarMoeda = (val: number) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0);
 
-  // Cálculos baseados nos filtros de Mês e Ano
   const frotaMes = registrosFrota
     .filter((item) => item.criado_em && item.criado_em.slice(0, 7) === mesFiltro)
     .reduce((acc, curr) => acc + Number(curr.valor || 0), 0);
@@ -46,12 +45,10 @@ export default function VisaoGeralPage() {
     .filter((item) => item.criado_em && item.criado_em.slice(0, 4) === anoFiltro)
     .reduce((acc, curr) => acc + Number(curr.valor || 0), 0);
 
-  // Se você tiver outras despesas (como Obras ou Financeiro), pode somar aqui também
-  const despesasTotaisMes = frotaMes; // Adicione outras fontes se houver
+  const despesasTotaisMes = frotaMes;
 
   return (
     <div className="space-y-6 p-6">
-      {/* Cabeçalho */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-slate-800/50 p-4 rounded-xl border border-slate-700/80 gap-4">
         <div>
           <h1 className="text-2xl font-bold text-white">Visão Geral</h1>
@@ -70,7 +67,6 @@ export default function VisaoGeralPage() {
         </div>
       </div>
 
-      {/* Cards de Resumo */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
         <div className="bg-slate-800/80 p-5 rounded-xl border border-slate-700 shadow">
           <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Faturamento Total</p>
