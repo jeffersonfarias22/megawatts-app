@@ -9,6 +9,12 @@ interface RegistroFrota {
   criado_em: string;
 }
 
+interface RegistroObra {
+  id: number;
+  valor: number;
+  criado_em: string;
+}
+
 export default function VisaoGeralPage() {
   const hoje = new Date();
   const [mesFiltro, setMesFiltro] = useState(
@@ -17,6 +23,7 @@ export default function VisaoGeralPage() {
   const [anoFiltro] = useState(String(hoje.getFullYear()));
 
   const [registrosFrota, setRegistrosFrota] = useState<RegistroFrota[]>([]);
+  const [registrosObras, setRegistrosObras] = useState<RegistroObra[]>([]);
   const [carregando, setCarregando] = useState(true);
 
   useEffect(() => {
@@ -25,27 +32,40 @@ export default function VisaoGeralPage() {
 
   const carregarDadosGerais = async () => {
     setCarregando(true);
-    const { data, error } = await supabase.from('registros_frota').select('*');
-    if (error) {
-      console.error('Erro ao carregar frota para visão geral:', error);
-    } else if (data) {
-      setRegistrosFrota(data);
-    }
+    
+    // Busca frota
+    const { data: dataFrota } = await supabase.from('registros_frota').select('*');
+    // Busca obras (ajuste 'valor' se o nome da sua coluna for diferente)
+    const { data: dataObras } = await supabase.from('obras').select('*');
+
+    if (dataFrota) setRegistrosFrota(dataFrota);
+    if (dataObras) setRegistrosObras(dataObras);
+    
     setCarregando(false);
   };
 
   const formatarMoeda = (val: number) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0);
 
+  // Cálculos de Frota
   const frotaMes = registrosFrota
-    .filter((item) => item.criado_em && item.criado_em.slice(0, 7) === mesFiltro)
+    .filter((item) => item.criado_em?.slice(0, 7) === mesFiltro)
     .reduce((acc, curr) => acc + Number(curr.valor || 0), 0);
 
   const frotaAnual = registrosFrota
-    .filter((item) => item.criado_em && item.criado_em.slice(0, 4) === anoFiltro)
+    .filter((item) => item.criado_em?.slice(0, 4) === anoFiltro)
     .reduce((acc, curr) => acc + Number(curr.valor || 0), 0);
 
-  const despesasTotaisMes = frotaMes;
+  // Cálculos de Obras
+  const obrasMes = registrosObras
+    .filter((item) => item.criado_em?.slice(0, 7) === mesFiltro)
+    .reduce((acc, curr) => acc + Number(curr.valor || 0), 0);
+
+  const obrasAnual = registrosObras
+    .filter((item) => item.criado_em?.slice(0, 4) === anoFiltro)
+    .reduce((acc, curr) => acc + Number(curr.valor || 0), 0);
+
+  const despesasTotaisMes = frotaMes + obrasMes;
 
   return (
     <div className="space-y-6 p-6">
@@ -62,7 +82,7 @@ export default function VisaoGeralPage() {
             type="month"
             value={mesFiltro}
             onChange={(e) => setMesFiltro(e.target.value)}
-            className="bg-transparent text-sm font-semibold text-yellow-400 focus:outline-none scheme-dark cursor-pointer"
+            className="bg-transparent text-sm font-semibold text-yellow-400 focus:outline-none cursor-pointer"
           />
         </div>
       </div>
@@ -73,19 +93,19 @@ export default function VisaoGeralPage() {
           <p className="text-xl font-bold text-white mt-2">R$ 0,00</p>
         </div>
 
-        <div className="bg-slate-800/80 p-5 rounded-xl border border-slate-700 shadow">
+        <div className="bg-slate-800/80 p-5 rounded-xl border border-rose-400/30 shadow">
           <p className="text-[11px] font-semibold text-rose-400 uppercase tracking-wider">Despesas Totais</p>
           <p className="text-xl font-bold text-rose-400 mt-2">{carregando ? '...' : formatarMoeda(despesasTotaisMes)}</p>
         </div>
 
-        <div className="bg-slate-800/80 p-5 rounded-xl border border-slate-700 shadow">
-          <p className="text-[11px] font-semibold text-blue-400 uppercase tracking-wider">Saldo Obras (Mês)</p>
-          <p className="text-xl font-bold text-blue-400 mt-2">R$ 1.000,00</p>
+        <div className="bg-slate-800/80 p-5 rounded-xl border border-blue-500/30 shadow">
+          <p className="text-[11px] font-semibold text-blue-400 uppercase tracking-wider">Obras (Mês)</p>
+          <p className="text-xl font-bold text-blue-400 mt-2">{carregando ? '...' : formatarMoeda(obrasMes)}</p>
         </div>
 
-        <div className="bg-slate-800/80 p-5 rounded-xl border border-slate-700 shadow">
-          <p className="text-[11px] font-semibold text-blue-400 uppercase tracking-wider">Obras Anual ({anoFiltro})</p>
-          <p className="text-xl font-bold text-blue-400 mt-2">R$ 1.000,00</p>
+        <div className="bg-slate-800/80 p-5 rounded-xl border border-blue-500/30 shadow">
+          <p className="text-[11px] font-semibold text-blue-400 uppercase tracking-wider">Obras Anual</p>
+          <p className="text-xl font-bold text-blue-400 mt-2">{carregando ? '...' : formatarMoeda(obrasAnual)}</p>
         </div>
 
         <div className="bg-slate-800 p-5 rounded-xl border border-yellow-500/40 bg-gradient-to-br from-slate-800 to-yellow-950/20 shadow">
@@ -94,7 +114,7 @@ export default function VisaoGeralPage() {
         </div>
 
         <div className="bg-slate-800 p-5 rounded-xl border border-yellow-500/40 bg-gradient-to-br from-slate-800 to-yellow-950/20 shadow">
-          <p className="text-[11px] font-semibold text-yellow-400 uppercase tracking-wider">Frota Anual ({anoFiltro})</p>
+          <p className="text-[11px] font-semibold text-yellow-400 uppercase tracking-wider">Frota Anual</p>
           <p className="text-xl font-bold text-yellow-400 mt-2">{carregando ? '...' : formatarMoeda(frotaAnual)}</p>
         </div>
       </div>
