@@ -3,138 +3,195 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
-interface RegistroFrota {
+interface Veiculo {
   id: number;
-  descricao: string;
-  valor: number;
-  criado_em?: string;
+  nome_carro: string;
+  placa: string;
+  gasto_total: number;
 }
 
 export default function FrotaPage() {
-  const [registrosFrota, setRegistrosFrota] = useState<RegistroFrota[]>([]);
-  const [descricaoInput, setDescricaoInput] = useState('');
-  const [valorInput, setValorInput] = useState('');
+  const [veiculos, setVeiculos] = useState<Veiculo[]>([]);
+  const [nomeCarro, setNomeCarro] = useState('');
+  const [placa, setPlaca] = useState('');
+  const [gastoTotal, setGastoTotal] = useState('');
+  const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
 
   useEffect(() => {
-    carregarDados();
+    carregarFrota();
   }, []);
 
-  const carregarDados = async () => {
-    const { data, error } = await supabase.from('registros_frota').select('*').order('id', { ascending: false });
+  const carregarFrota = async () => {
+    setCarregando(true);
+    const { data, error } = await supabase.from('frota').select('*').order('id', { ascending: false });
     if (error) {
       console.error('Erro ao carregar frota:', error);
     } else if (data) {
-      setRegistrosFrota(data);
+      setVeiculos(data);
     }
+    setCarregando(false);
   };
 
-  const formatarMoeda = (valor: number) => {
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor || 0);
-  };
+  const formatarMoeda = (val: number) =>
+    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0);
 
-  const formatarDataHora = (dataIso?: string) => {
-    if (!dataIso) return '-';
-    return new Date(dataIso).toLocaleString('pt-BR');
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSalvarVeiculo = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!descricaoInput || !valorInput) return alert('Preencha todos os campos.');
+    if (!nomeCarro || !placa) return;
 
     setSalvando(true);
-    const { error } = await supabase.from('registros_frota').insert([
+    const { error } = await supabase.from('frota').insert([
       {
-        descricao: descricaoInput,
-        valor: Number(valorInput),
+        nome_carro: nomeCarro,
+        placa: placa.toUpperCase(),
+        gasto_total: Number(gastoTotal) || 0,
       },
     ]);
 
     if (error) {
-      alert('Erro ao salvar: ' + error.message);
+      alert('Erro ao salvar veículo: ' + error.message);
     } else {
-      setDescricaoInput('');
-      setValorInput('');
-      await carregarDados();
+      setNomeCarro('');
+      setPlaca('');
+      setGastoTotal('');
+      await carregarFrota();
     }
     setSalvando(false);
   };
 
-  const excluirLancamento = async (id: number) => {
-    if (!confirm('Deseja excluir este registro de frota?')) return;
-    await supabase.from('registros_frota').delete().eq('id', id);
-    await carregarDados();
+  const excluirVeiculo = async (id: number) => {
+    if (!confirm('Deseja realmente excluir este veículo?')) return;
+    const { error } = await supabase.from('frota').delete().eq('id', id);
+    if (error) {
+      alert('Erro ao excluir: ' + error.message);
+    } else {
+      await carregarFrota();
+    }
   };
+
+  // Identificar qual carro gasta mais (ordenando do maior para o menor gasto)
+  const veiculosOrdenados = [...veiculos].sort((a, b) => Number(b.gasto_total) - Number(a.gasto_total));
+  const carroQueMaisGasta = veiculosOrdenados.length > 0 ? veiculosOrdenados[0] : null;
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl md:text-3xl font-bold text-white">Gestão de Frota</h1>
-        <p className="text-slate-400 text-sm">Controle de despesas e manutenções de veículos</p>
+      {/* Cabeçalho */}
+      <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700/80">
+        <h1 className="text-2xl font-bold text-white">Controle de Frota</h1>
+        <p className="text-slate-400 text-sm">Gerenciamento de veículos, placas e custos</p>
       </div>
 
-      <div className="bg-slate-800 p-4 sm:p-6 rounded-xl border border-slate-700">
-        <h2 className="text-lg font-bold text-yellow-400 mb-4">Novo Registro de Frota</h2>
-        <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
+      {/* Destaque: Qual carro gasta mais */}
+      {carroQueMaisGasta && (
+        <div className="bg-slate-800 p-5 rounded-xl border border-rose-500/40 bg-gradient-to-br from-slate-800 to-rose-950/20 shadow">
+          <p className="text-xs font-semibold text-rose-400 uppercase tracking-wider">Veículo com Maior Custo</p>
+          <div className="flex justify-between items-end mt-2">
+            <div>
+              <p className="text-xl font-bold text-white">{carroQueMaisGasta.nome_carro}</p>
+              <p className="text-xs text-slate-400 font-mono">Placa: {carroQueMaisGasta.placa}</p>
+            </div>
+            <p className="text-2xl font-bold text-rose-400">{formatarMoeda(carroQueMaisGasta.gasto_total)}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Formulário de Cadastro */}
+      <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow space-y-4">
+        <h3 className="text-white font-bold text-base">Cadastrar Novo Veículo</h3>
+        <form onSubmit={handleSalvarVeiculo} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Descrição (ex: Combustível, Peças)</label>
+            <label className="block text-xs font-semibold text-slate-300 mb-1">Nome do Carro</label>
             <input
               type="text"
-              placeholder="Ex: Troca de pneu / Óleo"
-              value={descricaoInput}
-              onChange={(e) => setDescricaoInput(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white text-sm"
+              required
+              placeholder="Ex: Fiat Strada"
+              value={nomeCarro}
+              onChange={(e) => setNomeCarro(e.target.value)}
+              className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-yellow-500"
             />
           </div>
+
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Valor (R$)</label>
+            <label className="block text-xs font-semibold text-slate-300 mb-1">Placa</label>
+            <input
+              type="text"
+              required
+              placeholder="Ex: ABC-1D23"
+              value={placa}
+              onChange={(e) => setPlaca(e.target.value)}
+              className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-white uppercase focus:outline-none focus:border-yellow-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-1">Gasto Inicial / Total (R$)</label>
             <input
               type="number"
               step="0.01"
-              placeholder="150.00"
-              value={valorInput}
-              onChange={(e) => setValorInput(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white text-sm"
+              placeholder="0.00"
+              value={gastoTotal}
+              onChange={(e) => setGastoTotal(e.target.value)}
+              className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-yellow-500"
             />
           </div>
+
           <button
             type="submit"
             disabled={salvando}
-            className="w-full bg-yellow-500 hover:bg-yellow-400 text-slate-950 font-bold py-2.5 px-4 rounded-lg text-sm transition"
+            className="bg-yellow-500 hover:bg-yellow-400 text-slate-950 font-bold p-2.5 rounded-lg text-sm transition shadow h-[42px]"
           >
-            {salvando ? 'Salvando...' : 'Adicionar Registro'}
+            {salvando ? 'Salvando...' : 'Salvar Veículo'}
           </button>
         </form>
       </div>
 
-      <div className="bg-slate-800 p-4 sm:p-6 rounded-xl border border-slate-700">
-        <h3 className="text-base font-bold text-slate-200 mb-4">Histórico da Frota</h3>
+      {/* Tabela de Veículos (Ordenada automaticamente por quem gasta mais) */}
+      <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden shadow-lg">
+        <div className="p-4 border-b border-slate-700 flex justify-between items-center">
+          <h3 className="font-bold text-white text-base">Frota Cadastrada (Do maior para o menor custo)</h3>
+          <span className="text-xs text-slate-400">{veiculos.length} veículo(s)</span>
+        </div>
+
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm border-collapse min-w-[600px]">
+          <table className="w-full text-left border-collapse min-w-[600px]">
             <thead>
-              <tr className="border-b border-slate-700 text-slate-400">
-                <th className="py-2.5 px-3">Data e Hora</th>
-                <th className="py-2.5 px-3">Descrição</th>
-                <th className="py-2.5 px-3">Valor</th>
-                <th className="py-2.5 px-3 text-center">Ações</th>
+              <tr className="bg-slate-900/60 text-slate-400 text-xs uppercase tracking-wider border-b border-slate-700">
+                <th className="p-3">Veículo</th>
+                <th className="p-3">Placa</th>
+                <th className="p-3">Gasto Total</th>
+                <th className="p-3 text-center">Ações</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-700/50">
-              {registrosFrota.map((item) => (
-                <tr key={item.id} className="hover:bg-slate-700/30">
-                  <td className="py-2.5 px-3 text-slate-400 text-xs">{formatarDataHora(item.criado_em)}</td>
-                  <td className="py-2.5 px-3 font-semibold text-slate-200">{item.descricao}</td>
-                  <td className="py-2.5 px-3 text-yellow-400 font-semibold">{formatarMoeda(item.valor)}</td>
-                  <td className="py-2.5 px-3 text-center">
-                    <button
-                      onClick={() => excluirLancamento(item.id)}
-                      className="bg-rose-600/80 hover:bg-rose-600 text-white text-xs py-1 px-2.5 rounded"
-                    >
-                      Excluir
-                    </button>
-                  </td>
+            <tbody className="divide-y divide-slate-700 text-sm text-slate-200">
+              {carregando ? (
+                <tr>
+                  <td colSpan={4} className="text-center p-6 text-slate-400">Carregando frota...</td>
                 </tr>
-              ))}
+              ) : veiculosOrdenados.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="text-center p-6 text-slate-400">Nenhum veículo cadastrado na frota.</td>
+                </tr>
+              ) : (
+                veiculosOrdenados.map((item, index) => (
+                  <tr key={item.id} className="hover:bg-slate-700/30 transition">
+                    <td className="p-3 font-semibold text-white flex items-center gap-2">
+                      {index === 0 && <span className="text-xs bg-rose-500/20 text-rose-400 px-2 py-0.5 rounded font-bold">Maior Gasto</span>}
+                      {item.nome_carro}
+                    </td>
+                    <td className="p-3 font-mono text-yellow-400 font-semibold">{item.placa}</td>
+                    <td className="p-3 font-bold text-rose-400">{formatarMoeda(item.gasto_total)}</td>
+                    <td className="p-3 text-center">
+                      <button
+                        onClick={() => excluirVeiculo(item.id)}
+                        className="text-rose-400 hover:text-rose-300 text-xs font-semibold px-2.5 py-1 bg-rose-500/10 rounded border border-rose-500/20 transition"
+                      >
+                        Excluir
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
